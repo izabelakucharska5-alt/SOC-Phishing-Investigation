@@ -1,8 +1,6 @@
 # SOC-Phishing-Investigation
 Phishing e-mail analysis and investigation
 
-# SOC Phishing Investigation
-
 ![Status](https://img.shields.io/badge/Status-In%20Progress-orange)
 ![SIEM](https://img.shields.io/badge/SIEM-Splunk-brightgreen)
 
