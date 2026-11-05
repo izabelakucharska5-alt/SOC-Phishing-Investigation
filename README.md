@@ -1,26 +1,23 @@
 # SOC-Phishing-Investigation
 Phishing e-mail analysis and investigation
-SOC Phishing Investigation
+# SOC Phishing Investigation
 
-Project: Phishing Email Investigation
-Role: SOC Analyst L1
-Focus: Blue Team | SIEM | Threat Detection | Incident Response
-Status: In Progress
+![Status](https://img.shields.io/badge/Status-In%20Progress-orange)
+![SIEM](https://img.shields.io/badge/SIEM-Splunk-brightgreen)
 
-Overview
+A hands-on SOC L1 project simulating the investigation of a phishing campaign targeting a fictional organization.
 
-This project simulates a SOC investigation into a phishing campaign targeting employees of a fictional organization.
+**Focus areas:**
+- Phishing email analysis
+- Email authentication (SPF, DKIM, DMARC)
+- SIEM investigation using Splunk
+- Security log analysis and event correlation
+- Account compromise investigation
+- Incident response
 
-The investigation focuses on identifying phishing indicators, analyzing email headers, investigating suspicious authentication events and assessing potential account compromise.
+**Tools:** Splunk, Microsoft Entra ID, MITRE ATT&CK.
 
-Incident Scenario
-
-Employees receive a suspicious email impersonating Microsoft 365 Security, warning that their mailboxes will be suspended unless they verify their accounts.
-
-Initial findings:
-
-12 employees received the email.
-
+*Note: This project uses simulated data and fictional scenarios for educational purposes.*
 3 employees clicked the malicious link.
 
 SPF and DMARC authentication checks failed.
