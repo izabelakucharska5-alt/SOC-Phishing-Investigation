@@ -1,8 +1,8 @@
 # SOC-Phishing-Investigation
-Phishing e-mail analysis and investigation
 
-![Status](https://img.shields.io/badge/Status-In%20Progress-orange)
-![Project](https://img.shields.io/badge/Type-Blue%20Team-blue)
+**Phishing Email Analysis & Incident Investigation**
+
+![Status](https://img.shields.io/badge/Status-Completed-brightgreen) ![Project](https://img.shields.io/badge/Type-Blue%20Team-blue)
 
 A simulated SOC L1 investigation of a phishing campaign targeting employees of a fictional organization.
 
@@ -10,10 +10,11 @@ A simulated SOC L1 investigation of a phishing campaign targeting employees of a
 - Phishing email and header analysis
 - Email authentication (SPF, DKIM, DMARC)
 - Security log analysis and event correlation
-- Account compromise investigation
-- Incident triage and response
+- Suspicious sign-in investigation
+- Account compromise assessment
+- Incident triage and response recommendations
 - MITRE ATT&CK mapping
 
-**Technologies & Frameworks:** CSV log analysis, MITRE ATT&CK, SPL (detection query examples).
+**Technologies & Frameworks:** CSV log analysis, SPL (Splunk Search Processing Language), MITRE ATT&CK.
 
-*Note: This is an educational project based on fictional scenarios and synthetic data. SPL queries are illustrative and have not been executed in a live Splunk environment.*
+*Note: This is an educational project based on fictional scenarios and synthetic data. SPL queries are documented detection examples and have not yet been executed in a live Splunk environment.*
