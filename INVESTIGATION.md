@@ -25,7 +25,6 @@ The investigation uses a fictional organization and synthetic email, proxy, and 
 The message contains several phishing indicators:
 
 - The sender uses `micros0ft365.example`, with a zero in place of the letter “o”.
-- The `Reply-To` and `Return-Path` domains differ from the visible sender domain.
 - The subject and message create urgency by threatening mailbox suspension.
 - The link points to `m365-auth.example`, not an official Microsoft domain.
 - The authentication results are `SPF=fail`, `DKIM=none`, and `DMARC=fail`.
