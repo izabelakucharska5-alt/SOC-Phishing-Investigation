@@ -165,7 +165,7 @@ Each employee generated one URL click event.
 ```spl
 index=main source="simulated_logs_fixed.csv" event_type="signin"
 | table timestamp user src_ip src_location device_id result mfa risk details
-| sort 0 timestamp
+| sort 0 _time
 ```
 
 **Results:** Three authentication events were identified for Anna:
