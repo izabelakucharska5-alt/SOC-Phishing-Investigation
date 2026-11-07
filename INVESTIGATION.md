@@ -256,7 +256,6 @@ All messages were associated with:
 
 ![Phishing Campaign Recipients](Screenshots/07-phishing-campaign-recipients.png)
 
-![Phishing Campaign Recipients](Screenshots/07-phishing-campaign-recipients.png)
 
 ### 5.7. Recipient Impact Assessment
 
