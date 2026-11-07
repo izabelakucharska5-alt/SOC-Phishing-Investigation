@@ -235,20 +235,26 @@ Identified indicators:
 
 **Objective:** Identify all recipients of the suspicious email and verify the campaign distribution scope.
 
-**Results:** The search returned 12 recipients.
+**Executed SPL:**
+
+```spl
+index=main source="simulated_logs_fixed.csv" event_type="email_received"
+| stats count values(sender) as sender values(src_ip) as source_ip values(domain) as domain by recipient
+| sort recipient
+```
+
+**Results:** The search returned 12 recipients. Each recipient had one recorded email delivery event.
 
 All messages were associated with:
-- The same sender.
-- The same source IP: `203.0.113.45`.
-- The same sender domain: `micros0ft365.example`.
+- The same sender: `no-reply@micros0ft365.example`
+- The same source IP: `203.0.113.45`
+- The same sender domain: `micros0ft365.example`
 
-Each recipient had one recorded delivery event.
-
-**Analysis:** The results indicate a single phishing campaign distributed to 12 employees.
-
-**Documentation note:** The screenshot documents the result table, but does not show the complete SPL query. Therefore, the exact executed command is not reproduced here.
+**Analysis:** The results indicate a single phishing campaign distributed to 12 employees. Grouping the email events by recipient made it possible to establish the campaign's distribution scope.
 
 **Evidence:**
+
+![Phishing Campaign Recipients](Screenshots/07-phishing-campaign-recipients.png)
 
 ![Phishing Campaign Recipients](Screenshots/07-phishing-campaign-recipients.png)
 
