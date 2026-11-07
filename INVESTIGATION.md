@@ -1,117 +1,99 @@
-## 6. Splunk investigation — executed SPL searches
+# Phishing Email Investigation — SOC L1
 
-The investigation was conducted in Splunk using the synthetic dataset `simulated_logs_fixed.csv`. The following searches were executed to identify the phishing campaign, determine its impact, and investigate suspicious activity associated with Anna Kowalska's account.
+**Project type:** Simulated Blue Team investigation  
+**Status:** Investigation completed; findings documented using executed Splunk searches.  
+**Dataset:** [`data/simulated_logs_fixed.csv`](data/simulated_logs_fixed.csv)
 
-### A. Event overview for Anna Kowalska
+## 1. Executive summary
 
-**Purpose:** Review Anna's email, URL click, and sign-in events in chronological order.
+A phishing email impersonating Microsoft 365 was delivered to **12 employees**. The available proxy events show that **3 employees clicked** the link in the message.
 
-```spl
-index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
-| search event_type="url_click" OR event_type="signin"
-| table _time event_type user src_ip src_location device_id action result mfa risk url
-| sort 0 _time
-```
+One of them, Anna Kowalska, was followed three minutes later by a successful sign-in from an unfamiliar device and an unusual IP geolocated to Berlin. The sign-in was marked **High risk**, and Anna denied performing it.
 
-**Observed results:** Four events were returned: two earlier successful sign-ins from Warsaw, one URL click at 09:15, and one successful High-risk sign-in from Berlin at 09:18.
+The correlation between the phishing URL click and the subsequent suspicious authentication event provides strong indicators of a potential account compromise.
 
-### B. Email authentication analysis
+The investigation identified:
+- 12 phishing email delivery events.
+- 3 employees who visited the suspicious URL.
+- 1 suspicious successful sign-in associated with Anna Kowalska.
+- An unfamiliar IP address and unknown device.
+- A High-risk sign-in rating.
+- Successful MFA reported during the suspicious sign-in.
 
-**Purpose:** Identify suspicious email authentication results and determine whether multiple messages belong to the same campaign.
+These indicators support treating Anna's account as **suspected compromised** and escalating the case to the incident response team.
 
-```spl
-index=main source="simulated_logs_fixed.csv" event_type="email_received"
-| stats count values(sender) as senders values(domain) as domains values(spf) as spf values(dkim) as dkim values(dmarc) as dmarc by subject
-```
+The dataset does not prove how the attacker authenticated or whether Anna submitted her credentials. A successful MFA result does not establish that the legitimate user performed the sign-in.
 
-**Observed results:** 12 email events were returned under the same subject: `[Action required] Your mailbox will be suspended in 24 hours`. The sender was `no-reply@micros0ft365.example`. Authentication results were SPF fail, DKIM none, and DMARC fail.
+## 2. Incident scope and evidence
 
-### C. Phishing campaign recipient impact
+The investigation uses a fictional organization and synthetic email, proxy, and sign-in events. All names and `.example` domains are fictional. IP addresses in the documentation ranges are reserved for examples and are not real attacker infrastructure.
 
-**Purpose:** Identify the recipients affected by the phishing campaign and review the sender and source IP associated with the messages.
+| Data source | What it contains |
+|---|---|
+| Email gateway events | Message sender, recipients, subject, delivery time, SPF/DKIM/DMARC results |
+| Proxy events | Users who visited the suspicious URL and event timestamps |
+| Sign-in events | User, source IP, approximate location, device, MFA result, and risk rating |
 
-**Observed results:** 12 unique recipients were identified. All messages came from `no-reply@micros0ft365.example`, with source IP `203.0.113.45` and domain `micros0ft365.example`.
+### Initial email triage
 
-*Note: The screenshot documents the results, but does not show the complete SPL query. The exact executed command is therefore not reproduced here.*
+The message contains several phishing indicators:
 
-### D. Identify users who clicked the phishing link
+- The sender uses `micros0ft365.example`, with a zero in place of the letter "o".
+- The subject and message create urgency by threatening mailbox suspension.
+- The link points to `m365-auth.example`, not an official Microsoft domain.
+- The authentication results are `SPF=fail`, `DKIM=none`, and `DMARC=fail`.
 
-**Purpose:** Compare the number of email deliveries and URL clicks for each account.
+**Authentication note:** SPF is evaluated against the SMTP envelope sender domain, which may differ from the visible From domain. The available investigation screenshots do not establish the SMTP envelope sender, so its exact domain cannot be confirmed. `DKIM=none` means no DKIM signature was reported. `DMARC=fail` means the message did not pass DMARC, which requires an aligned SPF or DKIM pass.
 
-```spl
-index=main source="simulated_logs_fixed.csv"
-| eval account=if(event_type="email_received",replace(recipient,"@company.example",""),user)
-| stats count(eval(event_type="url_click")) as clicks count(eval(event_type="signin")) as signins values(eval(if(event_type="signin",src_ip,null()))) as signin_ips values(eval(if(event_type="signin",risk,null()))) as risk_levels by account
-| where clicks>0
-```
+## 3. Investigation findings
 
-**Observed results:** Three accounts had recorded phishing URL clicks:
+### Phishing campaign
 
-- Anna Kowalska — 1 click, 3 sign-ins, two observed source IPs and High/Low risk levels.
-- Marta Zielińska — 1 click.
-- Piotr Nowak — 1 click.
+- **12** email delivery events were recorded.
+- **12** unique recipients were identified.
+- All messages shared the same subject and sender.
+- The sender was `no-reply@micros0ft365.example`.
+- The source IP recorded for the email campaign was `203.0.113.45`.
+- **3** users visited the suspicious URL: Anna Kowalska, Piotr Nowak, and Marta Zielińska.
 
-Anna's activity stood out because her account had additional suspicious authentication activity.
+The available data shows URL visits, but does not show whether users entered credentials or submitted a form.
 
-### E. Investigate the suspicious sign-in
+### Suspicious sign-in
 
-**Purpose:** Isolate Anna's sign-in events with a High-risk rating, unknown device, or Berlin location.
+Anna's sign-in history contains two earlier successful sign-ins from the same IP and device in Warsaw.
 
-```spl
-index=main source="simulated_logs_fixed.csv" user="anna.kowalska" event_type="signin"
-| where risk="high" OR device_id="unknown" OR src_location="Berlin, Germany"
-| table _time user src_ip src_location device_id result mfa risk details
-| sort 0 _time
-```
+On 5 November 2026 at 09:18 (UTC+01:00), a further successful sign-in was recorded with these differences:
 
-**Observed results:** One event was returned:
+| Field | Earlier activity | Suspicious event |
+|---|---|---|
+| Source IP | `198.51.100.10` | `203.0.113.77` |
+| Approximate location | Warsaw, Poland | Berlin, Germany |
+| Device ID | `ANN-LAPTOP-01` | `unknown` |
+| MFA | Successful | Successful |
+| Sign-in risk | Low | High |
 
-- Time: 5 November 2026, 09:18
-- Source IP: `203.0.113.77`
-- Location: Berlin, Germany
-- Device ID: `unknown`
-- Result: success
-- MFA: success
-- Risk: high
-- Device details: Chrome, Windows 11, device compliance unknown.
+Anna clicked the phishing link at **09:15**, three minutes before the suspicious sign-in. She stated that she did not perform the sign-in.
 
-This event differed significantly from Anna's earlier sign-ins.
+The timing, unfamiliar device, different IP/location, High-risk rating, and user's denial make account compromise a credible concern.
 
-### F. Review activity after the suspicious sign-in
+**Assessment:** Suspected account compromise — **High priority for escalation**.
 
-**Purpose:** Check whether additional sign-in activity was recorded after the suspicious event.
+The evidence does not establish the exact access method. Possible explanations such as stolen credentials, MFA fatigue, or session-token theft require additional telemetry and must not be presented as confirmed findings.
 
-```spl
-index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
-| where _time >= strptime("2026-11-05 09:18:00", "%Y-%m-%d %H:%M:%S")
-| table _time event_type src_ip src_location device_id action result mfa risk details
-| sort 0 _time
-```
+## 4. Event timeline
 
-**Observed results:** One event was returned: the successful High-risk sign-in from Berlin at 09:18. No subsequent events were present in the available dataset.
+All times are from the synthetic dataset and use UTC+01:00.
 
-### G. Overall event distribution
+| Date and time | Event |
+|---|---|
+| 5 Nov 2026, 08:10 | Anna signs in from her usual IP and device in Warsaw. |
+| 5 Nov 2026, 08:42 | Phishing email delivered to 12 employees. |
+| 5 Nov 2026, 09:15 | Anna visits the suspicious URL. |
+| 5 Nov 2026, 09:18 | Successful, High-risk sign-in for Anna from an unfamiliar device and IP geolocated to Berlin; MFA reported successful. |
+| 5 Nov 2026, 09:22 | Piotr visits the suspicious URL. |
+| 5 Nov 2026, 09:31 | Marta visits the suspicious URL. |
 
-**Purpose:** Establish the total number of events for each event type in the dataset.
+## 5. Recommended response actions
 
-```spl
-index=main source="simulated_logs_fixed.csv"
-| stats count by event_type
-| sort - count
-```
-
-**Observed results:**
-
-- `email_received` — 12 events.
-- `signin` — 3 events.
-- `url_click` — 3 events.
-
-A total of 18 events were identified.
-
-### Investigation conclusion
-
-The executed searches identified a phishing campaign affecting 12 employees, with three recorded URL clicks. Correlation of the email, proxy, and sign-in events revealed a strong indicator of suspected account compromise involving Anna Kowalska.
-
-The most significant finding was a successful High-risk sign-in from an unfamiliar IP and device in Berlin, occurring three minutes after Anna visited the phishing URL. This activity differed from her previous successful low-risk sign-ins from Warsaw.
-
-The findings justify treating the incident as a suspected account compromise and escalating it to SOC L2 / Incident Response. The available logs do not establish the precise authentication method or independently prove that the phishing link caused the suspicious sign-in.
+1. **Escalate to SOC L2 / Incident Response.** Treat Anna's account as potentially compromised; preserve the relevant email, proxy, and identity logs.
+2. **Contain the account.** Following the
