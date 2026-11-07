@@ -259,28 +259,30 @@ All messages were associated with:
 
 ### 5.7. Recipient Impact Assessment
 
-**Objective:** Identify employees who interacted with the phishing email and compare their activity with the total recipient population.
+**Objective:** Identify all employees who received the phishing email and determine which recipients clicked the malicious link.
 
 **Executed SPL:**
 
-```spl
-index=main source="simulated_logs_fixed.csv"
-| eval account=if(event_type="email_received",replace(recipient,"@company.example",""),user)
-| stats count(eval(event_type="url_click")) as clicks count(eval(event_type="signin")) as signins values(eval(if(event_type="signin",src_ip,null()))) as signin_ips values(eval(if(event_type="signin",risk,null()))) as risk_levels by account
-| where clicks>0
+```spl id="r7k2mp"
+index=main source="simulated_logs_fixed.csv" (event_type="email_received" OR event_type="url_click")
+| eval account=if(event_type="email_received", replace(recipient,"@company.example",""), user)
+| stats count(eval(event_type="email_received")) as emails_received count(eval(event_type="url_click")) as links_clicked by account
+| eval status=if(links_clicked>0,"Clicked phishing link","Received only")
+| sort - links_clicked
 ```
 
-**Results:** Three accounts were returned:
+**Results:**
+- 12 employees received the phishing email.
+- 3 employees clicked the phishing link.
+- 9 employees received the email but did not click the link.
+- The click rate was 25%.
 
-| Account | Clicks | Sign-ins | Risk levels |
-|---|---:|---:|---|
-| anna.kowalska | 1 | 3 | High, Low |
-| marta.zielinska | 1 | 0 | — |
-| piotr.nowak | 1 | 0 | — |
+**Analysis:** The search correlates email delivery events with URL click events by employee account. It identifies the three employees requiring further investigation and distinguishes them from recipients who did not interact with the suspicious link.
 
-**Analysis:** All three employees who clicked the phishing URL were identified. Anna's account required additional investigation because its authentication history contained a High-risk event.
+Anna Kowalska was selected for further investigation because her account also showed suspicious authentication activity.
 
 **Evidence:**
+
 
 ![Recipient Impact](Screenshots/08-recipient-impact.png)
 
