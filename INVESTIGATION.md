@@ -21,13 +21,11 @@ The suspicious authentication event had:
 - A successful MFA result
 - A High sign-in risk rating
 
-Previous successful sign-ins originated from Warsaw, Poland, using the same known device (`ANN-LAPTOP-01`) and were classified as Low risk.
+Previous successful sign-ins originated from Warsaw, Poland, using the same known device (`ANN-LAPTOP-01`) and were classified as Low risk. The earlier baseline activity includes a successful sign-in on 4 November 2026 at 08:55 and another on 5 November 2026 at 08:10.
 
 Anna denied performing the suspicious sign-in.
 
-The combination of the phishing link interaction, unusual authentication activity, unfamiliar device, geographic deviation, High risk classification, and user's denial provides **strong evidence of suspected account compromise**.
-
-The incident should be escalated to SOC L2 / Incident Response for containment and further investigation.
+The combination of the phishing link interaction, unusual authentication activity, unfamiliar device, geographic deviation, High risk classification, and user's denial provides **strong evidence of suspected account compromise**. The incident should be escalated to SOC L2 / Incident Response for containment and further investigation.
 
 The available logs do not establish the exact authentication method used by the attacker or prove that Anna submitted her credentials.
 
@@ -68,7 +66,7 @@ The available data confirms URL visits but does not establish whether users ente
 
 ### 3.2. Suspicious Sign-in
 
-Anna's sign-in history contains two earlier successful sign-ins from the same IP and device in Warsaw.
+Anna's sign-in history contains two earlier successful sign-ins from the same IP and device in Warsaw: 4 November 2026 at 08:55 and 5 November 2026 at 08:10.
 
 On 5 November 2026 at 09:18 (UTC+01:00), a further successful sign-in was recorded with these differences:
 
@@ -94,7 +92,8 @@ All times are from the synthetic dataset and use UTC+01:00.
 
 | Date and time | Event |
 |---|---|
-| 5 Nov 2026, 08:10 | Anna signs in from her usual IP and device in Warsaw. |
+| 4 Nov 2026, 08:55 | Anna signs in successfully from Warsaw using `ANN-LAPTOP-01`; risk Low. |
+| 5 Nov 2026, 08:10 | Anna signs in successfully again from her usual IP and device in Warsaw; risk Low. |
 | 5 Nov 2026, 08:42 | Phishing email delivered to 12 employees. |
 | 5 Nov 2026, 09:15 | Anna visits the suspicious URL. |
 | 5 Nov 2026, 09:18 | Successful High-risk sign-in for Anna from an unfamiliar device and IP geolocated to Berlin; MFA reported successful. |
@@ -103,9 +102,7 @@ All times are from the synthetic dataset and use UTC+01:00.
 
 ## 5. Splunk Investigation — Executed SPL Searches
 
-The investigation was conducted in Splunk using the synthetic dataset `simulated_logs_fixed.csv`.
-
-The following searches document the investigation process, including event identification, phishing campaign analysis, recipient impact and suspicious authentication activity.
+The investigation was conducted in Splunk using the synthetic dataset `simulated_logs_fixed.csv`. Each screenshot is placed immediately after the corresponding SPL search so the query and its observed output can be reviewed together.
 
 ### 5.1. Initial Event Overview
 
@@ -119,6 +116,8 @@ index=main source="simulated_logs_fixed.csv"
 | sort - count
 ```
 
+![Initial Event Overview — Splunk search and results](Screenshots/02-event-overview.png)
+
 **Results:**
 - `email_received`: 12 events.
 - `signin`: 3 events.
@@ -127,56 +126,49 @@ index=main source="simulated_logs_fixed.csv"
 
 **Analysis:** The dataset contains 12 email delivery events, three authentication events and three recorded visits to suspicious URLs. This established the initial scope of the investigation.
 
-**Evidence:**
-
-![Initial Event Overview](Screenshots/02-event-overview.png)
-
 ### 5.2. Identification of Phishing URL Clicks
 
-**Objective:** Identify employees who interacted with the suspicious URL.
+**Objective:** Identify employees who interacted with the suspicious URL and review the URLs and source IPs associated with those visits.
 
 **Executed SPL:**
 
 ```spl
 index=main source="simulated_logs_fixed.csv" event_type="url_click"
-| stats count by user
+| stats count values(url) as visited_urls values(src_ip) as source_ips by user
 | sort - count
 ```
 
-**Results:** Three employees were identified:
-- Anna Kowalska
-- Piotr Nowak
-- Marta Zielińska
+![Phishing URL Clicks — Splunk search and results](Screenshots/03-phishing-url-clicks.png)
 
-Each employee generated one URL click event.
+**Results:** Three employees were identified:
+- `anna.kowalska` — 1 click, source IP `10.10.20.15`.
+- `marta.zielinska` — 1 click, source IP `10.10.20.31`.
+- `piotr.nowak` — 1 click, source IP `10.10.20.22`.
+
+Each event contains a URL pointing to `https://m365-auth.example/verify` with a user-specific query parameter.
 
 **Analysis:** Three out of twelve recipients interacted with the suspicious link. These employees were selected for further investigation. The logs confirm URL visits but do not establish whether credentials were submitted.
 
-**Evidence:**
-
-![Phishing URL Clicks](Screenshots/03-phishing-url-clicks.png)
-
 ### 5.3. Sign-in Activity Review
 
-**Objective:** Examine Anna's authentication activity and establish her normal sign-in pattern.
+**Objective:** Examine all authentication events and establish Anna's normal sign-in pattern.
 
 **Executed SPL:**
 
 ```spl
 index=main source="simulated_logs_fixed.csv" event_type="signin"
-| table timestamp user src_ip src_location device_id result mfa risk details
+| table _time user src_ip src_location device_id result mfa risk details
 | sort 0 _time
 ```
 
-**Results:** Three authentication events were identified for Anna:
-- Two successful sign-ins from Warsaw using `ANN-LAPTOP-01`.
-- One successful sign-in from Berlin using an unknown device.
+![Sign-in Activity — Splunk search and results](Screenshots/04-signin-activity.png)
 
-**Analysis:** The first two authentication events established a consistent sign-in pattern. The third event represented a significant deviation and required further investigation.
+**Results:** Three authentication events were returned, all for Anna:
+- 4 November 2026, 08:55 — successful sign-in from Warsaw using `ANN-LAPTOP-01`, with Low risk.
+- 5 November 2026, 08:10 — successful sign-in from Warsaw using `ANN-LAPTOP-01`, with Low risk.
+- 5 November 2026, 09:18 — successful sign-in from Berlin using an unknown device, with High risk.
 
-**Evidence:**
-
-![Sign-in Activity](Screenshots/04-signin-activity.png)
+**Analysis:** The first two authentication events established a consistent sign-in pattern. The third event represented a significant deviation and required further investigation. The search does not filter on Anna's username; Anna is the user returned in all three sign-in events in this dataset.
 
 ### 5.4. Correlation of Phishing and Authentication Events
 
@@ -191,16 +183,14 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
 | sort 0 _time
 ```
 
-**Results:** The relevant events showed:
+![Anna Event Correlation — Splunk search and results](Screenshots/05-anna-event-correlation.png)
+
+**Results:** Four events were returned:
 - Two earlier successful sign-ins from Warsaw.
 - A phishing URL visit at 09:15.
 - A successful High-risk sign-in from Berlin at 09:18.
 
 **Analysis:** The suspicious authentication occurred three minutes after Anna visited the phishing URL. This temporal correlation increased the priority of the investigation. Timing alone does not prove that the phishing interaction directly caused the authentication event.
-
-**Evidence:**
-
-![Anna Event Correlation](Screenshots/05-anna-event-correlation.png)
 
 ### 5.5. Email Authentication Analysis
 
@@ -212,6 +202,8 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
 index=main source="simulated_logs_fixed.csv" event_type="email_received"
 | stats count values(sender) as senders values(domain) as domains values(spf) as spf values(dkim) as dkim values(dmarc) as dmarc by subject
 ```
+
+![Email Authentication Analysis — Splunk search and results](Screenshots/06-email-authentication.png)
 
 **Results:** The search returned 12 email events associated with the same subject.
 
@@ -227,10 +219,6 @@ Identified indicators:
 
 **Assessment:** Malicious phishing email.
 
-**Evidence:**
-
-![Email Authentication Analysis](Screenshots/06-email-authentication.png)
-
 ### 5.6. Phishing Campaign Recipient Identification
 
 **Objective:** Identify all recipients of the suspicious email and verify the campaign distribution scope.
@@ -243,6 +231,8 @@ index=main source="simulated_logs_fixed.csv" event_type="email_received"
 | sort recipient
 ```
 
+![Phishing Campaign Recipients — Splunk search and results](Screenshots/07-phishing-campaign-recipients.png)
+
 **Results:** The search returned 12 recipients. Each recipient had one recorded email delivery event.
 
 All messages were associated with:
@@ -252,43 +242,58 @@ All messages were associated with:
 
 **Analysis:** The results indicate a single phishing campaign distributed to 12 employees. Grouping the email events by recipient made it possible to establish the campaign's distribution scope.
 
-**Evidence:**
-
-![Phishing Campaign Recipients](Screenshots/07-phishing-campaign-recipients.png)
-
-
 ### 5.7. Recipient Impact Assessment
 
-**Objective:** Identify all employees who received the phishing email and determine which recipients clicked the malicious link.
+**Objective:** Identify which employees received the phishing email and distinguish users who clicked the suspicious link from recipients who did not.
 
 **Executed SPL:**
 
-```spl id="r7k2mp"
-index=main source="simulated_logs_fixed.csv" (event_type="email_received" OR event_type="url_click")
-| eval account=if(event_type="email_received", replace(recipient,"@company.example",""), user)
+```spl
+index=main source="simulated_logs_fixed.csv"
+| eval account=if(event_type="email_received",replace(recipient,"@company.example",""),user)
 | stats count(eval(event_type="email_received")) as emails_received count(eval(event_type="url_click")) as links_clicked by account
 | eval status=if(links_clicked>0,"Clicked phishing link","Received only")
 | sort - links_clicked
 ```
 
-**Results:**
+![Recipient Impact — Splunk search and results](Screenshots/08-recipient-impact.png..png)
+
+**Results:** The output contains 12 accounts:
 - 12 employees received the phishing email.
-- 3 employees clicked the phishing link.
+- 3 employees clicked the phishing link: Anna, Marta and Piotr.
 - 9 employees received the email but did not click the link.
-- The click rate was 25%.
+- The click rate was 25% (3 of 12 recipients).
 
 **Analysis:** The search correlates email delivery events with URL click events by employee account. It identifies the three employees requiring further investigation and distinguishes them from recipients who did not interact with the suspicious link.
 
-Anna Kowalska was selected for further investigation because her account also showed suspicious authentication activity.
+### 5.8. Account-Level Click and Sign-in Correlation
 
-**Evidence:**
+**Objective:** Compare phishing-link clicks with sign-in activity for each account that clicked the link.
 
+**Executed SPL:**
 
-![Recipient Impact](Screenshots/08-recipient-impact.png)
+```spl
+index=main source="simulated_logs_fixed.csv"
+| eval account=if(event_type="email_received",replace(recipient,"@company.example",""),user)
+| stats count(eval(event_type="url_click")) as clicks count(eval(event_type="signin")) as signins values(eval(if(event_type="signin",src_ip,null()))) as signin_ips values(eval(if(event_type="signin",risk,null()))) as risk_levels by account
+| where clicks>0
+```
 
-### 5.8. Identification of Account Compromise Indicators
+![Account-Level Click and Sign-in Correlation — Splunk search and results](Screenshots/09-account-compromise-indicators.png)
 
-**Objective:** Isolate suspicious authentication events associated with Anna's account.
+**Results:** Three accounts were returned:
+
+| Account | Clicks | Sign-ins | Sign-in IPs | Risk levels |
+|---|---:|---:|---|---|
+| anna.kowalska | 1 | 3 | `198.51.100.10`, `203.0.113.77` | High, Low |
+| marta.zielinska | 1 | 0 | — | — |
+| piotr.nowak | 1 | 0 | — | — |
+
+**Analysis:** All three employees who clicked the phishing URL were identified. Anna's account required additional investigation because it had three sign-in events, including the High-risk authentication from an unfamiliar IP. Marta and Piotr had no sign-in events in the supplied dataset.
+
+### 5.9. Identification of the Suspicious Sign-in
+
+**Objective:** Isolate the anomalous authentication event associated with Anna's account.
 
 **Executed SPL:**
 
@@ -299,86 +304,46 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska" event_type="si
 | sort 0 _time
 ```
 
-**Results:** One event matched the investigation criteria.
+![Anomalous Sign-in Details — Splunk search and results](Screenshots/10-anomalous-signin-details.png)
+
+**Results:** One event matched the investigation criteria:
 
 | Field | Observed value |
 |---|---|
 | Timestamp | 2026-11-05 09:18:00 |
-| User | anna.kowalska |
-| Source IP | 203.0.113.77 |
+| User | `anna.kowalska` |
+| Source IP | `203.0.113.77` |
 | Location | Berlin, Germany |
-| Device ID | unknown |
-| Result | success |
-| MFA | success |
-| Risk | high |
-| Device compliance | unknown |
+| Device ID | `unknown` |
+| Result | `success` |
+| MFA | `success` |
+| Risk | `high` |
+| Device compliance | `unknown` |
 
-**Analysis:** The event differed significantly from Anna's established authentication pattern. The combination of an unfamiliar IP, unusual geographic location, unknown device and High-risk classification represents strong evidence of suspicious account activity.
-
-Anna also denied performing this authentication.
+**Analysis:** The event differed significantly from Anna's established authentication pattern. The combination of an unfamiliar IP, unusual geographic location, unknown device and High-risk classification represents strong evidence of suspicious account activity. Anna also denied performing this authentication.
 
 **Assessment:** High-priority suspected account compromise.
 
-**Evidence:**
-
-![Account Compromise Indicators](Screenshots/09-account-compromise-indicators.png)
-
-### 5.9. Detailed Analysis of the Anomalous Sign-in
-
-**Objective:** Examine the suspicious authentication event and compare its attributes with previously observed activity.
-
-**Executed SPL:**
-
-```spl
-index=main source="simulated_logs_fixed.csv" user="anna.kowalska" event_type="signin"
-| table _time src_ip src_location device_id result mfa risk details
-| sort 0 _time
-```
-
-**Results:** The suspicious event was recorded on 5 November 2026 at 09:18.
-
-Compared with previous authentication activity:
-- The source IP changed from `198.51.100.10` to `203.0.113.77`.
-- The approximate location changed from Warsaw to Berlin.
-- The device changed from `ANN-LAPTOP-01` to `unknown`.
-- The risk classification changed from Low to High.
-
-Authentication and MFA were both reported as successful.
-
-**Analysis:** Successful MFA does not establish that the legitimate account owner performed the authentication. Further investigation requires identity-provider authentication details, session records and MFA approval history.
-
-**Evidence:**
-
-![Anomalous Sign-in Details](Screenshots/10-anomalous-signin-details.png)
-
 ### 5.10. Reconstruction of Anna's Event Timeline
 
-**Objective:** Reconstruct the sequence of events affecting Anna's account and establish the chronological relationship between the phishing campaign and suspicious authentication.
+**Objective:** Review the sequence of events associated with Anna's account, including the earlier baseline sign-ins, email delivery, URL click and suspicious sign-in.
 
-**Executed SPL:**
+**SPL visible in the supplied screenshot:**
 
 ```spl
-index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
-| table _time event_type src_ip src_location device_id action result mfa risk details
 | sort 0 _time
 ```
 
-**Results:**
+![Anna Event Timeline — Splunk results](Screenshots/11-anna-event-timeline.png)
 
-| Time | Event |
-|---|---|
-| 08:10 | Successful sign-in from Warsaw using the known device. |
-| 08:42 | Phishing email delivered. |
-| 09:15 | Anna visits the suspicious URL. |
-| 09:18 | Successful High-risk sign-in from Berlin using an unknown device. |
+**Results:** The screenshot shows five events:
+- 4 November 2026, 08:55 — successful sign-in from Warsaw using the known device.
+- 5 November 2026, 08:10 — successful sign-in from Warsaw using the known device.
+- 5 November 2026, 08:42 — phishing email delivered.
+- 5 November 2026, 09:15 — Anna visits the suspicious URL.
+- 5 November 2026, 09:18 — successful High-risk sign-in from Berlin using an unknown device.
 
-**Analysis:** The reconstructed timeline establishes that the suspicious authentication occurred three minutes after the phishing URL visit. Combined with the authentication anomalies and Anna's denial, the timeline supports treating the incident as a suspected account compromise.
-
-The exact relationship between the phishing interaction and authentication event remains unconfirmed.
-
-**Evidence:**
-
-![Anna Event Timeline](Screenshots/11-anna-event-timeline.png)
+**Analysis:** The reconstructed timeline places the suspicious authentication three minutes after the phishing URL visit. The screenshot confirms the five-event result set, but the beginning of the SPL query is outside the captured area; therefore, the full query is not represented as an exact command here.
 
 ### 5.11. Post-Compromise Activity Review
 
@@ -393,15 +358,11 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
 | sort 0 _time
 ```
 
-**Results:** One event was returned: the suspicious High-risk sign-in at 09:18.
+![Post-Compromise Activity Check — Splunk search and results](Screenshots/12-post-compromise-activity-check.png)
 
-No subsequent events were present in the supplied dataset.
+**Results:** One event was returned: the suspicious High-risk sign-in at 09:18. No subsequent events were present in the supplied dataset.
 
 **Analysis:** No additional post-authentication activity could be established from the available logs. This does not prove that the account was not accessed further. The dataset does not contain mailbox audit records, endpoint telemetry or detailed identity-provider session activity.
-
-**Evidence:**
-
-![Post-Compromise Activity Check](Screenshots/12-post-compromise-activity-check.png)
 
 ## 6. Consolidated Investigation Findings
 
@@ -410,6 +371,7 @@ No subsequent events were present in the supplied dataset.
 | Phishing emails delivered | 12 |
 | Unique recipients | 12 |
 | Employees who clicked the link | 3 |
+| Employees who did not click | 9 |
 | Suspicious email authentication | SPF fail, DKIM none, DMARC fail |
 | Suspicious account | Anna Kowalska |
 | Suspicious authentication | 5 November 2026, 09:18 |
@@ -467,22 +429,3 @@ The investigation identified a phishing campaign affecting 12 employees, three r
 The strongest indicators concern Anna Kowalska's account: she visited the suspicious URL at 09:15, followed by a successful High-risk sign-in from an unfamiliar device and IP geolocated to Berlin at 09:18.
 
 The evidence supports escalating the incident as a suspected account compromise. Further identity, endpoint and mailbox telemetry would be necessary to confirm the attack mechanism and determine the full impact of the incident.
-
-## 11. Investigation Screenshots
-
-The `Screenshots/` directory contains the visual evidence collected during the investigation.
-
-| Screenshot | Description |
-|---|---|
-| [02-event-overview.png](Screenshots/02-event-overview.png) | Initial event overview |
-| [03-phishing-url-clicks.png](Screenshots/03-phishing-url-clicks.png) | Employees who clicked the phishing URL |
-| [04-signin-activity.png](Screenshots/04-signin-activity.png) | Authentication activity |
-| [05-anna-event-correlation.png](Screenshots/05-anna-event-correlation.png) | Correlation of Anna's phishing interaction and sign-in |
-| [06-email-authentication.png](Screenshots/06-email-authentication.png) | SPF, DKIM and DMARC analysis |
-| [07-phishing-campaign-recipients.png](Screenshots/07-phishing-campaign-recipients.png) | Phishing campaign recipients |
-| [08-recipient-impact.png](Screenshots/08-recipient-impact.png) | Account-level campaign impact |
-| [09-account-compromise-indicators.png](Screenshots/09-account-compromise-indicators.png) | Indicators of suspected account compromise |
-| [10-anomalous-signin-details.png](Screenshots/10-anomalous-signin-details.png) | Detailed analysis of the suspicious authentication |
-| [11-anna-event-timeline.png](Screenshots/11-anna-event-timeline.png) | Chronological reconstruction of Anna's activity |
-| [12-post-compromise-activity-check.png](Screenshots/12-post-compromise-activity-check.png) | Review of activity following the suspicious sign-in |
-
