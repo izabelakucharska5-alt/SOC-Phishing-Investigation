@@ -1,3 +1,4 @@
+
 # Phishing Email Investigation — SOC L1
 
 **Project type:** Simulated Blue Team investigation  
@@ -25,7 +26,9 @@ Previous successful sign-ins originated from Warsaw, Poland, using the same know
 
 Anna denied performing the suspicious sign-in.
 
-The combination of the phishing link interaction, unusual authentication activity, unfamiliar device, geographic deviation, High risk classification, and user's denial provides **strong evidence of suspected account compromise**. The incident should be escalated to SOC L2 / Incident Response for containment and further investigation.
+The combination of the phishing link interaction, unusual authentication activity, unfamiliar device, geographic deviation, High risk classification, and user's denial provides **strong evidence of suspected account compromise**.
+
+The incident should be escalated to SOC L2 / Incident Response for containment and further investigation.
 
 The available logs do not establish the exact authentication method used by the attacker or prove that Anna submitted her credentials.
 
@@ -102,7 +105,9 @@ All times are from the synthetic dataset and use UTC+01:00.
 
 ## 5. Splunk Investigation — Executed SPL Searches
 
-The investigation was conducted in Splunk using the synthetic dataset `simulated_logs_fixed.csv`. Each screenshot is placed immediately after the corresponding SPL search so the query and its observed output can be reviewed together.
+The investigation was conducted in Splunk using the synthetic dataset `simulated_logs_fixed.csv`.
+
+The searches below are presented in chronological investigation order. Each screenshot is placed immediately after the corresponding SPL command so the query and its observed output can be reviewed together.
 
 ### 5.1. Initial Event Overview
 
@@ -151,7 +156,7 @@ Each event contains a URL pointing to `https://m365-auth.example/verify` with a 
 
 ### 5.3. Sign-in Activity Review
 
-**Objective:** Examine all authentication events and establish Anna's normal sign-in pattern.
+**Objective:** Examine all authentication events and establish the normal sign-in pattern.
 
 **Executed SPL:**
 
@@ -250,13 +255,14 @@ All messages were associated with:
 
 ```spl
 index=main source="simulated_logs_fixed.csv"
-| eval account=if(event_type="email_received",replace(recipient,"@company.example",""),user)
+(event_type="email_received" OR event_type="url_click")
+| eval account=if(event_type="email_received", replace(recipient,"@company.example",""), user)
 | stats count(eval(event_type="email_received")) as emails_received count(eval(event_type="url_click")) as links_clicked by account
 | eval status=if(links_clicked>0,"Clicked phishing link","Received only")
 | sort - links_clicked
 ```
 
-![Recipient Impact — Splunk search and results](Screenshots/08-recipient-impact.png..png)
+![Recipient Impact — Splunk search and results](Screenshots/08-recipient-impact.png)
 
 **Results:** The output contains 12 accounts:
 - 12 employees received the phishing email.
@@ -328,22 +334,26 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska" event_type="si
 
 **Objective:** Review the sequence of events associated with Anna's account, including the earlier baseline sign-ins, email delivery, URL click and suspicious sign-in.
 
-**SPL visible in the supplied screenshot:**
+**Executed SPL:**
 
 ```spl
+index=main source="simulated_logs_fixed.csv"
+| eval account=if(event_type="email_received", replace(recipient,"@company.example",""), user)
+| search account="anna.kowalska"
+| table _time event_type account src_ip src_location device_id action result mfa risk url details
 | sort 0 _time
 ```
 
-![Anna Event Timeline — Splunk results](Screenshots/11-anna-event-timeline.png)
+![Anna Event Timeline — Splunk search and results](Screenshots/11-anna-event-timeline.png)
 
-**Results:** The screenshot shows five events:
+**Results:** Five events were returned:
 - 4 November 2026, 08:55 — successful sign-in from Warsaw using the known device.
 - 5 November 2026, 08:10 — successful sign-in from Warsaw using the known device.
-- 5 November 2026, 08:42 — phishing email delivered.
+- 5 November 2026, 08:42 — phishing email delivered to Anna.
 - 5 November 2026, 09:15 — Anna visits the suspicious URL.
 - 5 November 2026, 09:18 — successful High-risk sign-in from Berlin using an unknown device.
 
-**Analysis:** The reconstructed timeline places the suspicious authentication three minutes after the phishing URL visit. The screenshot confirms the five-event result set, but the beginning of the SPL query is outside the captured area; therefore, the full query is not represented as an exact command here.
+**Analysis:** The reconstructed timeline places the suspicious authentication three minutes after the phishing URL visit. Combined with the authentication anomalies and Anna's denial, the timeline supports treating the incident as a suspected account compromise. The temporal relationship does not prove that the phishing interaction directly caused the suspicious sign-in.
 
 ### 5.11. Post-Compromise Activity Review
 
@@ -353,14 +363,16 @@ index=main source="simulated_logs_fixed.csv" user="anna.kowalska" event_type="si
 
 ```spl
 index=main source="simulated_logs_fixed.csv" user="anna.kowalska"
-| where _time >= strptime("2026-11-05 09:18:00", "%Y-%m-%d %H:%M:%S")
+| where _time >= strptime("2026-11-05 09:18:00","%Y-%m-%d %H:%M:%S")
 | table _time event_type src_ip src_location device_id action result mfa risk details
 | sort 0 _time
 ```
 
 ![Post-Compromise Activity Check — Splunk search and results](Screenshots/12-post-compromise-activity-check.png)
 
-**Results:** One event was returned: the suspicious High-risk sign-in at 09:18. No subsequent events were present in the supplied dataset.
+**Results:** One event was returned: the suspicious High-risk sign-in at 09:18.
+
+No subsequent events were present in the supplied dataset.
 
 **Analysis:** No additional post-authentication activity could be established from the available logs. This does not prove that the account was not accessed further. The dataset does not contain mailbox audit records, endpoint telemetry or detailed identity-provider session activity.
 
